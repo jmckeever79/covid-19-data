@@ -1,1 +1,4 @@
 .DS_Store
+*suo
+*checkpoint.ipynb
+*pyc

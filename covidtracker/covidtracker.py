@@ -5,8 +5,7 @@ import os
 from datetime import datetime
 
 class CovidTracker(object):
-    repos = 'C:/Users/jj/git/data/covid-19-data'
-    uscountyfile = os.path.join(repos, 'us-counties.csv')
+    uscountyfile = os.path.join(os.pardir, 'us-counties.csv')
     mostrecentdate = None
 
     def help(self):
@@ -20,6 +19,11 @@ class CovidTracker(object):
         if self.mostrecentdate is None:
             self.mostrecentdate = self.df['date'].max()
         return self.mostrecentdate
+
+    def getnationaltimeseries(self, stat='cases', **kwargs):
+        startdate = kwargs['startdate'] if 'startdate' in kwargs else None
+        enddate = kwargs['enddate'] if 'enddate' in kwargs else None
+        return self.df.groupby(['date']).sum()[stat].loc[startdate:enddate]
 
     def getdateframe(self, date, indexed=False):
         temp = self.df.loc[self.df['date']==date]
@@ -62,16 +66,24 @@ class CovidTracker(object):
             diff = diff/startframe[stat]
         return diff
 
-    def getdiffseries(self, stat='cases'):
-        by_date = self.df.groupby(['date']).sum()[stat]
+    def getnationaldiffseries(self, stat='cases', **kwargs):
+        s = self.getnationaltimeseries(stat=stat, **kwargs)
+        return s.diff()
+
+    def getdiffseries(self, stat='cases', startdate=None, enddate=None):
+        by_date = self.df.groupby(['date']).sum()[stat].loc[startdate:enddate]
         return by_date.diff()
 
-    def getdiffseries_state(self, state, stat='cases'):
-        sf = self.getstateframe(state)[stat]
+    def getdiffseries_state(self, state, stat='cases', **kwargs):
+        startdate = kwargs['startdate'] if 'startdate' in kwargs else None
+        enddate = kwargs['enddate'] if 'enddate' in kwargs else None
+        sf = self.getstateframe(state)[stat].loc[startdate:enddate]
         return sf.diff()
 
-    def getdiffseries_county(self, state, county, stat='cases'):
-        cf = self.getcountyframe(state, county)[stat]
+    def getdiffseries_county(self, state, county, stat='cases', **kwargs):
+        startdate = kwargs['startdate'] if 'startdate' in kwargs else None
+        enddate = kwargs['enddate'] if 'enddate' in kwargs else None
+        cf = self.getcountyframe(state, county)[stat].loc[startdate:enddate]
         return cf.diff()
 
     def getdeathspercase(self, date):
@@ -86,6 +98,16 @@ class CovidTracker(object):
     def _getdeathspercase_helper(self, df):
         rate = (df['deaths']/df['cases']).rename('deaths per case')
         return pd.concat([df, rate], axis=1, join='inner')
+
+    def _xlabelhelper(self, series):
+        return series.index[::int(len(series.index)/4)]
+
+    def plotnation(self, startdate=None, enddate=None, stat='cases'):
+        frame = self.getnationaltimeseries(stat=stat, startdate=startdate, enddate=enddate)
+        xlabels = self._xlabelhelper(frame)
+        plt.plot(frame.index, frame)
+        plt.xticks(xlabels, xlabels)
+        plt.show()
 
     def _getstateframe_helper(self, states, stat='cases'):
         if (isinstance(states, str)):
@@ -140,7 +162,7 @@ class CovidTracker(object):
     def _plotbarseries(self, series):
         ax = plt.subplot('111')
         b1 = ax.bar(series.index, series.values)
-        xlabels = series.index[::int(len(series.index)/4)]
+        xlabels = self._xlabelhelper(series)
         plt.xticks(xlabels, xlabels)
         plt.show()
 
@@ -171,3 +193,21 @@ class CovidTracker(object):
         xlabels = df.index[::int(len(df.index)/4)]
         plt.xticks(xlabels, xlabels)
         plt.show()
+
+    def _plotline(self, series):
+        plt.plot(series.index, series)
+        xlabels = self._xlabelhelper(series)
+        plt.xticks(xlabels, xlabels)
+        plt.show()
+
+    def plotrollingmean(self, window=7, stat='cases', **kwargs):
+        frame = self.getnationaldiffseries(stat=stat, **kwargs).rolling(window=window).mean()
+        self._plotline(frame)
+
+    def plotrollingmean_state(self, state, window=7, stat='cases', **kwargs):
+        frame = self.getdiffseries_state(state, stat=stat, **kwargs).rolling(window=window).mean()
+        self._plotline(frame)
+
+    def plotrollingmean_county(self, state, county, window=7, stat='cases', **kwargs):
+        frame = self.getdiffseries_county(state, county, stat=stat, **kwargs).rolling(window=window).mean()
+        self._plotline(frame)
