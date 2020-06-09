@@ -198,6 +198,7 @@ class CovidTracker(object):
         plt.plot(series.index, series)
         xlabels = self._xlabelhelper(series)
         plt.xticks(xlabels, xlabels)
+        plt.legend()
         plt.show()
 
     def plotrollingmean(self, window=7, stat='cases', **kwargs):
@@ -206,8 +207,10 @@ class CovidTracker(object):
 
     def plotrollingmean_state(self, state, window=7, stat='cases', **kwargs):
         frame = self.getdiffseries_state(state, stat=stat, **kwargs).rolling(window=window).mean()
+        frame = frame.rename(state)
         self._plotline(frame)
 
     def plotrollingmean_county(self, state, county, window=7, stat='cases', **kwargs):
         frame = self.getdiffseries_county(state, county, stat=stat, **kwargs).rolling(window=window).mean()
+        frame = frame.rename('{0}, {1}'.format(county, state))
         self._plotline(frame)
