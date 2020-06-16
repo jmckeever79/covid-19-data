@@ -51,20 +51,26 @@ class CovidTracker(object):
     def _set_index(self, frame):
         return frame.set_index(['state', 'county'])
 
-    def getperiodchange(self, enddate, days=1, stat='cases', pct_change=False):
-        endframe = self.getdateframe(enddate, indexed=False)
+    def getperiodchange(self, enddate, days=1, pct_change=False):
+        endframe = self.getdateframe(enddate, indexed=False).drop('date', axis=1)
         ts = pd.Timestamp(enddate)
         offset = '1 day' if days==1 else '{0} days'.format(days)
         startdate = str((ts - pd.Timedelta(offset)).date())
-        startframe = self.getdateframe(startdate, indexed=False)
+        startframe = self.getdateframe(startdate, indexed=False).drop('date', axis=1)
 
         endframe = self._set_index(endframe)
         startframe = self._set_index(startframe)
 
-        diff = endframe[stat]-startframe[stat]
+        diff = endframe-startframe
         if pct_change:
-            diff = diff/startframe[stat]
+            diff = diff/startframe
         return diff
+
+    def getperiodchange_state(self, state, enddate, days=1, pct_change=False):
+        return self.getperiodchange(endate, days=days, pct_change=pct_change).xs(state, level='state')
+
+    def getperiodchange_county(self, state, county, enddate, days=1, pct_change=False):
+        return self.getperiodchange_state(state, enddate, days=days, pct_change=pct_change).xs(county)
 
     def getnationaldiffseries(self, stat='cases', **kwargs):
         s = self.getnationaltimeseries(stat=stat, **kwargs)
