@@ -51,7 +51,7 @@ class CovidTracker(object):
     def _set_index(self, frame):
         return frame.set_index(['state', 'county'])
 
-    def getperiodchange(self, enddate, days=1, pct_change=False):
+    def getperiodchange(self, enddate, days=1, **kwargs):
         endframe = self.getdateframe(enddate, indexed=False).drop('date', axis=1)
         ts = pd.Timestamp(enddate)
         offset = '1 day' if days==1 else '{0} days'.format(days)
@@ -61,16 +61,21 @@ class CovidTracker(object):
         endframe = self._set_index(endframe)
         startframe = self._set_index(startframe)
 
+        pct_change = kwargs['pct_change'] if 'pct_change' in kwargs else None
+        cap = kwargs['case_cap'] if 'case_cap' in kwargs else None
+
         diff = endframe-startframe
+        if cap:
+            diff = diff.where(diff['cases'] >= cap)
         if pct_change:
             diff = diff/startframe
         return diff
 
-    def getperiodchange_state(self, state, enddate, days=1, pct_change=False):
-        return self.getperiodchange(endate, days=days, pct_change=pct_change).xs(state, level='state')
+    def getperiodchange_state(self, state, enddate, days=1, **kwargs):
+        return self.getperiodchange(endate, days=days, **kwargs).xs(state, level='state')
 
-    def getperiodchange_county(self, state, county, enddate, days=1, pct_change=False):
-        return self.getperiodchange_state(state, enddate, days=days, pct_change=pct_change).xs(county)
+    def getperiodchange_county(self, state, county, enddate, days=1, **kwargs):
+        return self.getperiodchange_state(state, enddate, days=days, **kwargs).xs(county)
 
     def getnationaldiffseries(self, stat='cases', **kwargs):
         s = self.getnationaltimeseries(stat=stat, **kwargs)
@@ -148,7 +153,7 @@ class CovidTracker(object):
                 result = pd.concat([result, county_frame], axis=1, join='inner')
         return result
 
-    def plot_county(self, counties, stat='cases'):
+    def plotcounty(self, counties, stat='cases'):
         frame = self._getcountyframe_helper(counties, stat)
         frame.plot()
         plt.show()
