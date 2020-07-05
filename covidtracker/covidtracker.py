@@ -3,17 +3,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
+from uspop import UsPop
 
 class CovidTracker(object):
     uscountyfile = os.path.join(os.pardir, 'us-counties.csv')
     mostrecentdate = None
+    df = None
+    pop = None
 
     def help(self):
         print('Figure it out for yourself, ass.')
 
     def load_counties(self):
-        self.df = pd.read_csv(self.uscountyfile)
-        self.df = self.df.drop('fips', axis=1)
+        if self.df is None:
+            self.df = pd.read_csv(self.uscountyfile)
+            self.df = self.df.drop('fips', axis=1)
+
+    def load_population(self):
+        if self.pop is None:
+            self.pop = UsPop()
+            self.pop.load()
 
     def getmostrecentdate(self):
         if self.mostrecentdate is None:
@@ -25,8 +34,11 @@ class CovidTracker(object):
         enddate = kwargs['enddate'] if 'enddate' in kwargs else None
         return self.df.groupby(['date']).sum()[stat].loc[startdate:enddate]
 
-    def getdateframe(self, date, indexed=False):
+    def getdateframe(self, date, indexed=False, includepop=False):
         temp = self.df.loc[self.df['date']==date]
+        if includepop:
+            temp = pd.merge(temp, self.pop.df, how='left', left_on=['state', 'county'], 
+                            right_on=['state', 'county'])
         if indexed:
             temp = temp.set_index(['state', 'county'])
         return temp
