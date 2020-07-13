@@ -4,9 +4,8 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>7723dfd4-9b0c-48e1-a7c2-0a72c0e79bcc</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>covidtracker.py</StartupFile>
-    <SearchPath>
-    </SearchPath>
+    <StartupFile>main.py</StartupFile>
+    <SearchPath>..\..\population</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>covidtracker</Name>
@@ -22,6 +21,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="covidtracker.py" />
+    <Compile Include="main.py">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

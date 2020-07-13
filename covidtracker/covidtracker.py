@@ -24,6 +24,13 @@ class CovidTracker(object):
             self.pop = UsPop()
             self.pop.load()
 
+    def _importpopulation(self, frame):
+        return pd.merge(frame, self.pop.df, how='left', left_on=['state', 'county'],
+                         right_on=['state', 'county'])
+
+    def _importpopulation_state(self, frame):
+        return pd.merge(frame, self.pop.stateframe, how='left', left_on=['state'], right_on=['state'])
+
     def getmostrecentdate(self):
         if self.mostrecentdate is None:
             self.mostrecentdate = self.df['date'].max()
@@ -37,14 +44,16 @@ class CovidTracker(object):
     def getdateframe(self, date, indexed=False, includepop=False):
         temp = self.df.loc[self.df['date']==date]
         if includepop:
-            temp = pd.merge(temp, self.pop.df, how='left', left_on=['state', 'county'], 
-                            right_on=['state', 'county'])
+            temp = self._importpopulation(temp)
+
         if indexed:
             temp = temp.set_index(['state', 'county'])
         return temp
 
-    def getstateframe(self, state, group_counties=False):
+    def getstateframe(self, state, group_counties=False, includepop=False):
         temp = self.df.loc[self.df['state']==state]
+        if (includepop):
+            temp = self._importpopulation(temp)
         groups = ['date']
         if (group_counties):
             groups.append('county')
@@ -73,10 +82,14 @@ class CovidTracker(object):
         endframe = self._set_index(endframe)
         startframe = self._set_index(startframe)
 
-        pct_change = kwargs['pct_change'] if 'pct_change' in kwargs else None
+        pct_change = kwargs['pct_change'] if 'pct_change' in kwargs else False
         cap = kwargs['case_cap'] if 'case_cap' in kwargs else None
+        includepop = kwargs['includepop'] if 'includepop' in kwargs else False
 
         diff = endframe-startframe
+        if includepop:
+            diff = self._importpopulation(diff)
+            diff = self._set_index(diff)
         if cap:
             diff = diff.where(diff['cases'] >= cap)
         if pct_change:
@@ -84,7 +97,8 @@ class CovidTracker(object):
         return diff
 
     def getperiodchange_state(self, state, enddate, days=1, **kwargs):
-        return self.getperiodchange(endate, days=days, **kwargs).xs(state, level='state')
+        temp = self.getperiodchange(enddate, days=days, **kwargs)
+        return temp.xs(state, level='state')
 
     def getperiodchange_county(self, state, county, enddate, days=1, **kwargs):
         return self.getperiodchange_state(state, enddate, days=days, **kwargs).xs(county)
