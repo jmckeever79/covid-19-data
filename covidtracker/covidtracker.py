@@ -4,12 +4,14 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 from uspop import UsPop
+from maskstats import MaskStats
 
 class CovidTracker(object):
     uscountyfile = os.path.join(os.pardir, 'us-counties.csv')
     mostrecentdate = None
     df = None
     pop = None
+    maskuse = None
 
     def help(self):
         print('Figure it out for yourself, ass.')
@@ -17,12 +19,17 @@ class CovidTracker(object):
     def load_counties(self):
         if self.df is None:
             self.df = pd.read_csv(self.uscountyfile)
-            self.df = self.df.drop('fips', axis=1)
+            #self.df = self.df.drop('fips', axis=1)
 
     def load_population(self):
         if self.pop is None:
             self.pop = UsPop()
             self.pop.load()
+
+    def load_maskstats(self):
+        if self.maskuse is None:
+            self.maskuse = MaskStats()
+            self.maskuse.load()
 
     def _importpopulation(self, frame):
         return pd.merge(frame, self.pop.df, how='left', left_on=['state', 'county'],
@@ -30,6 +37,14 @@ class CovidTracker(object):
 
     def _importpopulation_state(self, frame):
         return pd.merge(frame, self.pop.stateframe, how='left', left_on=['state'], right_on=['state'])
+
+    def _importmaskuse(self, frame):
+        return pd.merge(frame, self.maskuse.df, how='left', left_on=['fips'], right_on=['COUNTYFP'])
+
+    def _dropfips(self, frame):
+        temp = frame.drop('fips', axis=1)
+        temp = temp.drop('COUNTYFP', axis=1)
+        return temp
 
     def getmostrecentdate(self):
         if self.mostrecentdate is None:
@@ -41,10 +56,14 @@ class CovidTracker(object):
         enddate = kwargs['enddate'] if 'enddate' in kwargs else None
         return self.df.groupby(['date']).sum()[stat].loc[startdate:enddate]
 
-    def getdateframe(self, date, indexed=False, includepop=False):
+    def getdateframe(self, date, indexed=False, includepop=False, includemaskuse=False):
         temp = self.df.loc[self.df['date']==date]
         if includepop:
             temp = self._importpopulation(temp)
+
+        if includemaskuse:
+            temp = self._importmaskuse(temp)
+            temp = self._dropfips(temp)
 
         if indexed:
             temp = temp.set_index(['state', 'county'])
@@ -85,15 +104,24 @@ class CovidTracker(object):
         pct_change = kwargs['pct_change'] if 'pct_change' in kwargs else False
         cap = kwargs['case_cap'] if 'case_cap' in kwargs else None
         includepop = kwargs['includepop'] if 'includepop' in kwargs else False
+        includemaskuse = kwargs['includemaskuse'] if 'includemaskuse' in kwargs else False
 
+        fips = endframe['fips']
         diff = endframe-startframe
+        diff['fips'] = fips
+        setix = False
         if includepop:
             diff = self._importpopulation(diff)
-            diff = self._set_index(diff)
+            setix = True
+        if includemaskuse:
+            diff = self._importmaskuse(diff)
+            diff = self._dropfips(diff)
         if cap:
             diff = diff.where(diff['cases'] >= cap)
         if pct_change:
             diff = diff/startframe
+        if setix:
+            diff = self._set_index(diff)
         return diff
 
     def getperiodchange_state(self, state, enddate, days=1, **kwargs):
