@@ -42,9 +42,11 @@ class CovidTracker(object):
         return pd.merge(frame, self.maskuse.df, how='left', left_on=['fips'], right_on=['COUNTYFP'])
 
     def _dropfips(self, frame):
-        temp = frame.drop('fips', axis=1)
-        temp = temp.drop('COUNTYFP', axis=1)
-        return temp
+        if 'fips' in frame.columns:
+            frame = frame.drop('fips', axis=1)
+        if 'COUNTYFP' in frame.columns:
+            frame = frame.drop('COUNTYFP', axis=1)
+        return frame
 
     def getmostrecentdate(self):
         if self.mostrecentdate is None:
@@ -56,17 +58,23 @@ class CovidTracker(object):
         enddate = kwargs['enddate'] if 'enddate' in kwargs else None
         return self.df.groupby(['date']).sum()[stat].loc[startdate:enddate]
 
+    def _getdateframehelper(self, date):
+        return self.df.loc[self.df['date']==date]
+
     def getdateframe(self, date, indexed=False, includepop=False, includemaskuse=False):
-        temp = self.df.loc[self.df['date']==date]
+        temp = self._getdateframehelper(date)
+
         if includepop:
             temp = self._importpopulation(temp)
 
         if includemaskuse:
             temp = self._importmaskuse(temp)
-            temp = self._dropfips(temp)
-
+            
         if indexed:
             temp = temp.set_index(['state', 'county'])
+
+        temp = self._dropfips(temp)
+
         return temp
 
     def getstateframe(self, state, group_counties=False, includepop=False):
@@ -92,11 +100,11 @@ class CovidTracker(object):
         return frame.set_index(['state', 'county'])
 
     def getperiodchange(self, enddate, days=1, **kwargs):
-        endframe = self.getdateframe(enddate, indexed=False).drop('date', axis=1)
+        endframe = self._getdateframehelper(enddate).drop('date', axis=1)
         ts = pd.Timestamp(enddate)
         offset = '1 day' if days==1 else '{0} days'.format(days)
         startdate = str((ts - pd.Timedelta(offset)).date())
-        startframe = self.getdateframe(startdate, indexed=False).drop('date', axis=1)
+        startframe = self._getdateframehelper(startdate).drop('date', axis=1)
 
         endframe = self._set_index(endframe)
         startframe = self._set_index(startframe)
@@ -115,13 +123,14 @@ class CovidTracker(object):
             setix = True
         if includemaskuse:
             diff = self._importmaskuse(diff)
-            diff = self._dropfips(diff)
         if cap:
             diff = diff.where(diff['cases'] >= cap)
         if pct_change:
             diff = diff/startframe
         if setix:
             diff = self._set_index(diff)
+
+        diff = self._dropfips(diff)
         return diff
 
     def getperiodchange_state(self, state, enddate, days=1, **kwargs):
